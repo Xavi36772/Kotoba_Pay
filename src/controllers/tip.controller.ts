@@ -19,7 +19,11 @@ export async function createTip(req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const order = await paypalService.createTipOrder(amount);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const returnUrl = `${baseUrl}/api/payments/tip/success`;
+    const cancelUrl = `${baseUrl}/api/payments/tip/cancel`;
+
+    const order = await paypalService.createTipOrder(amount, returnUrl, cancelUrl);
 
     await transactionModel.createTransaction({
       userId,
