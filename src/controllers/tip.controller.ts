@@ -31,8 +31,9 @@ export async function createTip(req: AuthRequest, res: Response): Promise<void> 
 
     res.json({ orderID: order.id });
   } catch (err: any) {
-    console.error('createTip error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to create tip order' });
+    const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+    console.error('createTip error:', detail);
+    res.status(500).json({ error: detail.substring(0, 300) });
   }
 }
 
