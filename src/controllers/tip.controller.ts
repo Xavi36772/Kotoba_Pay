@@ -19,10 +19,7 @@ export async function createTip(req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const returnUrl = req.body.returnUrl || `${req.protocol}://${req.get('host')}/api/payments/tip/success`;
-    const cancelUrl = req.body.cancelUrl || `${req.protocol}://${req.get('host')}/api/payments/tip/cancel`;
-
-    const order = await paypalService.createTipOrder(amount, returnUrl, cancelUrl);
+    const order = await paypalService.createTipOrder(amount);
 
     await transactionModel.createTransaction({
       userId,
@@ -32,9 +29,7 @@ export async function createTip(req: AuthRequest, res: Response): Promise<void> 
       authorId,
     });
 
-    const approvalLink = order.links?.find((l: any) => l.rel === 'approve')?.href;
-
-    res.json({ orderID: order.id, approvalUrl: approvalLink });
+    res.json({ orderID: order.id });
   } catch (err: any) {
     console.error('createTip error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to create tip order' });
