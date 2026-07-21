@@ -29,7 +29,10 @@ async function getAccessToken(): Promise<string> {
   return accessToken!;
 }
 
-const paypal = axios.create({ baseURL: PAYPAL_API });
+const paypal = axios.create({
+  baseURL: PAYPAL_API,
+  headers: { 'Content-Type': 'application/json' },
+});
 
 paypal.interceptors.request.use(async (config) => {
   const token = await getAccessToken();

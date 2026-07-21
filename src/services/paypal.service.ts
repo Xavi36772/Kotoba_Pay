@@ -20,7 +20,7 @@ export async function createTipOrder(amount: number, returnUrl: string, cancelUr
 }
 
 export async function captureTipOrder(orderId: string) {
-  const { data } = await paypal.post(`/v2/checkout/orders/${orderId}/capture`);
+  const { data } = await paypal.post(`/v2/checkout/orders/${orderId}/capture`, {});
   return data;
 }
 
