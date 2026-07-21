@@ -2,6 +2,10 @@
 -- Payment Service — SQL Migration
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- 0. Add paypal_email to users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS paypal_email TEXT;
+ALTER TABLE author_balances ADD COLUMN IF NOT EXISTS pending_payout NUMERIC(10,2) DEFAULT 0;
+
 -- 1. Payment transactions (tips + subscriptions + payouts)
 CREATE TABLE IF NOT EXISTS payment_transactions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
