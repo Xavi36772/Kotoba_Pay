@@ -1,11 +1,23 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
+let supabaseInstance: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
-  process.exit(1);
+export function initSupabase(): SupabaseClient {
+  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+    process.exit(1);
+  }
+
+  supabaseInstance = createClient(supabaseUrl, supabaseKey);
+  return supabaseInstance;
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export function getSupabase(): SupabaseClient {
+  if (!supabaseInstance) {
+    return initSupabase();
+  }
+  return supabaseInstance;
+}

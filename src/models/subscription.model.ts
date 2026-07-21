@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { getSupabase } from '../config/supabase';
 
 export async function createSubscription(data: {
   userId: string;
@@ -8,6 +8,7 @@ export async function createSubscription(data: {
   periodStart?: string;
   periodEnd?: string;
 }) {
+  const supabase = getSupabase();
   const { data: sub, error } = await supabase
     .from('subscriptions')
     .insert({
@@ -26,6 +27,7 @@ export async function createSubscription(data: {
 }
 
 export async function getActiveSubscription(userId: string) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
@@ -38,6 +40,7 @@ export async function getActiveSubscription(userId: string) {
 }
 
 export async function cancelSubscriptionInDb(subscriptionId: string) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('subscriptions')
     .update({ status: 'canceled', canceled_at: new Date().toISOString() })
@@ -50,6 +53,7 @@ export async function cancelSubscriptionInDb(subscriptionId: string) {
 }
 
 export async function updateSubscriptionByPaypalId(paypalId: string, updates: Record<string, any>) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('subscriptions')
     .update(updates)
