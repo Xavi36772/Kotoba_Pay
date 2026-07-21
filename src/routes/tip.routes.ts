@@ -12,7 +12,7 @@ router.post('/tip/capture', verifyToken, captureTip);
 
 // PayPal redirect endpoints (no auth required)
 router.get('/tip/success', async (req: Request, res: Response) => {
-  const orderId = req.query.orderId as string;
+  const orderId = (req.query.token as string) || (req.query.orderId as string);
   if (orderId) {
     try {
       const capture = await paypalService.captureTipOrder(orderId);
