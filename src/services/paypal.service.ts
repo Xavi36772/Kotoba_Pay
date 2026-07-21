@@ -3,13 +3,18 @@ import axios from 'axios';
 
 // ── Tips / Donations (Orders API v2) ─────────────────────────────────────
 
-export async function createTipOrder(amount: number, currency = 'USD') {
+export async function createTipOrder(amount: number, returnUrl: string, cancelUrl: string, currency = 'USD') {
   const { data } = await paypal.post('/v2/checkout/orders', {
     intent: 'CAPTURE',
     purchase_units: [{
       amount: { currency_code: currency, value: amount.toFixed(2) },
       description: 'Tip / Donation',
     }],
+    application_context: {
+      return_url: returnUrl,
+      cancel_url: cancelUrl,
+      user_action: 'PAY_NOW',
+    },
   });
   return data;
 }

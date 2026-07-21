@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as paypalService from '../services/paypal.service';
 import * as subscriptionModel from '../models/subscription.model';
 import * as transactionModel from '../models/transaction.model';
+import * as balanceModel from '../models/balance.model';
 
 // POST /api/webhooks/paypal
 export async function handleWebhook(req: Request, res: Response): Promise<void> {
@@ -62,6 +63,23 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
         const billingToken = req.body.resource?.billing_agreement_id;
         if (billingToken) {
           await transactionModel.updateTransactionBySubscriptionId(billingToken, { status: 'completed' });
+        }
+        break;
+      }
+
+      case 'CHECKOUT.ORDER.APPROVED': {
+        const orderId = req.body.resource?.id;
+        if (orderId) {
+          try {
+            const capture = await paypalService.captureTipOrder(orderId);
+            const status = capture.status === 'COMPLETED' ? 'completed' : 'failed';
+            const tx = await transactionModel.updateTransactionByOrderId(orderId, { status });
+            if (status === 'completed' && tx?.author_id) {
+              await balanceModel.addTipToBalance(tx.author_id, tx.amount);
+            }
+          } catch (e) {
+            console.error('auto-capture error for order', orderId, e);
+          }
         }
         break;
       }
