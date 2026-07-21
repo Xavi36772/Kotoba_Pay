@@ -13,19 +13,24 @@ router.post('/tip/capture', verifyToken, captureTip);
 // PayPal redirect endpoints (no auth required)
 router.get('/tip/success', async (req: Request, res: Response) => {
   const orderId = (req.query.token as string) || (req.query.orderId as string);
+  let captureStatus = 'unknown';
   if (orderId) {
     try {
       const capture = await paypalService.captureTipOrder(orderId);
-      const status = capture.status === 'COMPLETED' ? 'completed' : 'failed';
-      const tx = await transactionModel.updateTransactionByOrderId(orderId, { status });
-      if (status === 'completed' && tx?.author_id) {
+      captureStatus = capture.status === 'COMPLETED' ? 'completed' : 'failed';
+      const tx = await transactionModel.updateTransactionByOrderId(orderId, { status: captureStatus });
+      if (captureStatus === 'completed' && tx?.author_id) {
         await balanceModel.addTipToBalance(tx.author_id, tx.amount);
       }
-    } catch (e) {
-      console.error('auto-capture on success redirect error:', e);
+    } catch (e: any) {
+      captureStatus = 'error: ' + (e.message || 'unknown');
+      console.error('auto-capture on success redirect error:', e.message);
     }
   }
-  res.send('<html><body><h1>Pago aprobado</h1><p>Gracias por tu apoyo. Puedes cerrar esta ventana.</p></body></html>');
+  const message = captureStatus === 'completed'
+    ? '<h1>Pago completado</h1><p>Gracias por tu apoyo. Ya puedes cerrar esta ventana.</p>'
+    : `<h1>Pago aprobado</h1><p>Estado: ${captureStatus}. Si el pago no se refleja, vuelve a la app y presiona "Ya pagué".</p>`;
+  res.send(`<html><body>${message}</body></html>`);
 });
 
 router.get('/tip/cancel', (_req: Request, res: Response) => {

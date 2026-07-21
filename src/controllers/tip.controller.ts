@@ -66,7 +66,8 @@ export async function captureTip(req: AuthRequest, res: Response): Promise<void>
 
     res.json({ status, capture });
   } catch (err: any) {
-    console.error('captureTip error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to capture tip order' });
+    const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+    console.error('captureTip error:', detail);
+    res.status(500).json({ error: detail.substring(0, 400) });
   }
 }
