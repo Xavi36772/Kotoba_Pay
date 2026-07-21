@@ -1,6 +1,7 @@
-import { supabase } from '../config/supabase';
+import { getSupabase } from '../config/supabase';
 
 export async function getBalance(authorId: string) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('author_balances')
     .select('*')
@@ -12,6 +13,7 @@ export async function getBalance(authorId: string) {
 }
 
 export async function addTipToBalance(authorId: string, amount: number) {
+  const supabase = getSupabase();
   const { data, error } = await supabase.rpc('add_to_author_balance', {
     p_author_id: authorId,
     p_amount: amount,

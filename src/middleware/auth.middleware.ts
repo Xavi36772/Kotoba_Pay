@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../config/supabase';
+import { getSupabase } from '../config/supabase';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -13,6 +13,7 @@ export const verifyToken = async (req: AuthRequest, res: Response, next: NextFun
       return;
     }
 
+    const supabase = getSupabase();
     const { data, error } = await supabase.auth.getUser(token);
 
     if (error || !data.user) {
