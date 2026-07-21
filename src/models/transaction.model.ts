@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { getSupabase } from '../config/supabase';
 
 export async function createTransaction(data: {
   userId: string;
@@ -10,6 +10,7 @@ export async function createTransaction(data: {
   status?: string;
   authorId?: string;
 }) {
+  const supabase = getSupabase();
   const { data: tx, error } = await supabase
     .from('payment_transactions')
     .insert({
@@ -30,6 +31,7 @@ export async function createTransaction(data: {
 }
 
 export async function updateTransactionByOrderId(orderId: string, updates: Record<string, any>) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('payment_transactions')
     .update(updates)
@@ -42,6 +44,7 @@ export async function updateTransactionByOrderId(orderId: string, updates: Recor
 }
 
 export async function updateTransactionBySubscriptionId(subscriptionId: string, updates: Record<string, any>) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('payment_transactions')
     .update(updates)
@@ -54,6 +57,7 @@ export async function updateTransactionBySubscriptionId(subscriptionId: string, 
 }
 
 export async function getTransactionHistory(userId: string) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('payment_transactions')
     .select('*')

@@ -3,9 +3,13 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import routes from './routes';
+import { initSupabase } from './config/supabase';
 
 dotenv.config();
+
+initSupabase();
+
+import routes from './routes';
 
 const app = express();
 const PORT = process.env.PORT || 5002;
