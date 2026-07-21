@@ -29,7 +29,9 @@ export async function createTip(req: AuthRequest, res: Response): Promise<void> 
       authorId,
     });
 
-    res.json({ orderID: order.id });
+    const paypalBase = process.env.PAYPAL_MODE === 'live' ? 'https://www.paypal.com' : 'https://www.sandbox.paypal.com';
+    const checkoutUrl = `${paypalBase}/checkoutnow?token=${order.id}`;
+    res.json({ orderID: order.id, checkoutUrl });
   } catch (err: any) {
     const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
     console.error('createTip error:', detail);
