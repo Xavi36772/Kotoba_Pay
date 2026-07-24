@@ -3,6 +3,30 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import * as paypalService from '../services/paypal.service';
 import * as transactionModel from '../models/transaction.model';
 import * as balanceModel from '../models/balance.model';
+import { getSupabase } from '../config/supabase';
+
+async function notifyTipReceived(authorId: string, amount: number, donorUserId: string) {
+  try {
+    const supabase = getSupabase();
+    const { data: donor } = await supabase
+      .from('users')
+      .select('username')
+      .eq('id', donorUserId)
+      .single();
+
+    const donorName = donor?.username || 'Alguien';
+    const supabase2 = getSupabase();
+    await supabase2.from('notifications').insert({
+      user_id: authorId,
+      type: 'tip_received',
+      title: 'Donación recibida',
+      body: `$${amount.toFixed(2)} de @${donorName}`,
+      data: { amount, donorUserId, donorName },
+    });
+  } catch (err) {
+    console.error('notifyTipReceived error:', err);
+  }
+}
 
 // POST /api/payments/tip — create PayPal order for a tip
 export async function createTip(req: AuthRequest, res: Response): Promise<void> {
@@ -69,6 +93,7 @@ export async function captureTip(req: AuthRequest, res: Response): Promise<void>
     // Add to author balance if completed
     if (status === 'completed' && tx?.author_id) {
       await balanceModel.addTipToBalance(tx.author_id, tx.amount);
+      notifyTipReceived(tx.author_id, tx.amount, tx.user_id).catch(() => {});
     }
 
     res.json({ status, capture });
@@ -83,6 +108,7 @@ export async function captureTip(req: AuthRequest, res: Response): Promise<void>
         if (tx?.status !== 'completed' && tx?.author_id) {
           await transactionModel.updateTransactionByOrderId(req.body.orderId, { status: 'completed' });
           await balanceModel.addTipToBalance(tx.author_id, tx.amount);
+          notifyTipReceived(tx.author_id, tx.amount, tx.user_id).catch(() => {});
         }
         res.json({ status: 'completed', message: 'Pago ya registrado' });
         return;

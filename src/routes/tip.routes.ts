@@ -4,6 +4,7 @@ import { verifyToken } from '../middleware/auth.middleware';
 import * as paypalService from '../services/paypal.service';
 import * as transactionModel from '../models/transaction.model';
 import * as balanceModel from '../models/balance.model';
+import { getSupabase } from '../config/supabase';
 
 const router = Router();
 
@@ -21,6 +22,17 @@ router.get('/tip/success', async (req: Request, res: Response) => {
       const tx = await transactionModel.updateTransactionByOrderId(orderId, { status: captureStatus });
       if (captureStatus === 'completed' && tx?.author_id) {
         await balanceModel.addTipToBalance(tx.author_id, tx.amount);
+        try {
+          const supabase = getSupabase();
+          const { data: donor } = await supabase.from('users').select('username').eq('id', tx.user_id).single();
+          await supabase.from('notifications').insert({
+            user_id: tx.author_id,
+            type: 'tip_received',
+            title: 'Donación recibida',
+            body: `$${tx.amount.toFixed(2)} de @${donor?.username || 'Alguien'}`,
+            data: { amount: tx.amount, donorUserId: tx.user_id, donorName: donor?.username },
+          });
+        } catch (e) { console.error('tip notification error:', e); }
       }
     } catch (e: any) {
       captureStatus = 'error: ' + (e.message || 'unknown');
