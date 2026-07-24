@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { getSupabase } from '../config/supabase';
+import { sendPayout } from '../services/paypal.service';
+import * as transactionModel from '../models/transaction.model';
 
 // PUT /api/payments/paypal-email — save author's PayPal email
 export async function setPaypalEmail(req: AuthRequest, res: Response): Promise<void> {
@@ -100,7 +102,7 @@ export async function requestPayout(req: AuthRequest, res: Response): Promise<vo
     // Get current balance
     const { data: balance, error: balError } = await supabase
       .from('author_balances')
-      .select('balance')
+      .select('balance, pending_payout')
       .eq('author_id', userId)
       .single();
 
@@ -109,24 +111,65 @@ export async function requestPayout(req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Move balance to pending_payout
+    // Get user's PayPal email
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('paypal_email')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user?.paypal_email) {
+      res.status(400).json({ error: 'No PayPal email configured. Add it in Edit Profile.' });
+      return;
+    }
+
+    const amount = balance.balance;
+    const payoutId = `payout_${userId}_${Date.now()}`;
+
+    // Send actual payout via PayPal Payouts API
+    const payoutResult = await sendPayout(
+      user.paypal_email,
+      amount,
+      'Pago de donaciones de Kotoba',
+      payoutId,
+    );
+
+    const batchId = payoutResult?.batch_header?.payout_batch_id;
+
+    if (!batchId) {
+      res.status(500).json({ error: 'PayPal returned no batch ID' });
+      return;
+    }
+
+    // Record payout transaction
+    await transactionModel.createTransaction({
+      userId,
+      type: 'payout',
+      amount: -amount,
+      paypalOrderId: batchId,
+      status: 'completed',
+      authorId: userId,
+    });
+
+    // Deduct balance
     const { error: updateError } = await supabase
       .from('author_balances')
       .update({
-        pending_payout: balance.balance,
         balance: 0,
+        total_paid_out: (balance.pending_payout || 0) + amount,
+        pending_payout: 0,
       })
       .eq('author_id', userId);
 
     if (updateError) {
-      console.error('requestPayout error:', updateError);
-      res.status(500).json({ error: 'Failed to request payout' });
-      return;
+      console.error('requestPayout balance update error:', updateError);
+      // Payout was sent but we couldn't update balance — log for manual fix
     }
 
-    res.json({ status: 'requested', amount: balance.balance });
+    res.json({ status: 'completed', amount, batchId });
   } catch (err: any) {
-    console.error('requestPayout error:', err.message);
-    res.status(500).json({ error: 'Failed to request payout' });
+    const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+    console.error('requestPayout error:', detail);
+    res.status(500).json({ error: detail.substring(0, 400) });
   }
 }

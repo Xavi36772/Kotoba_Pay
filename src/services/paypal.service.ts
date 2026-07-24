@@ -49,7 +49,29 @@ export async function getSubscriptionDetails(subscriptionId: string) {
   return data;
 }
 
-// ── Webhook signature verification ───────────────────────────────────────
+// ── Payouts (Payments API v1) ─────────────────────────────────────────
+
+export async function sendPayout(email: string, amount: number, note: string, senderItemId: string) {
+  const { data } = await paypal.post('/v1/payments/payouts', {
+    sender_batch_header: {
+      email_subject: 'Kotoba - Has recibido un pago',
+      email_message: 'Tu saldo de Kotoba ha sido transferido a tu cuenta de PayPal.',
+    },
+    items: [
+      {
+        recipient_type: 'EMAIL',
+        amount: {
+          value: amount.toFixed(2),
+          currency: 'USD',
+        },
+        receiver: email,
+        note,
+        sender_item_id: senderItemId,
+      },
+    ],
+  });
+  return data;
+}
 
 export async function verifyWebhookSignature(headers: Record<string, string>, body: any): Promise<boolean> {
   try {
