@@ -53,6 +53,13 @@ export async function captureTip(req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    // Check if already captured
+    const existing = await transactionModel.findTransactionByOrderId(orderId);
+    if (existing?.status === 'completed') {
+      res.json({ status: 'completed', message: 'Pago ya registrado' });
+      return;
+    }
+
     const capture = await paypalService.captureTipOrder(orderId);
 
     const status = capture.status === 'COMPLETED' ? 'completed' : 'failed';
@@ -66,7 +73,22 @@ export async function captureTip(req: AuthRequest, res: Response): Promise<void>
 
     res.json({ status, capture });
   } catch (err: any) {
-    const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+    // Handle ORDER_ALREADY_CAPTURED as success
+    const PayPalError = err.response?.data;
+    if (PayPalError?.name === 'UNPROCESSABLE_ENTITY') {
+      const details = Array.isArray(PayPalError.details) ? PayPalError.details : [];
+      const alreadyCaptured = details.some((d: any) => d.issue === 'ORDER_ALREADY_CAPTURED');
+      if (alreadyCaptured) {
+        const tx = await transactionModel.findTransactionByOrderId(req.body.orderId);
+        if (tx?.status !== 'completed' && tx?.author_id) {
+          await transactionModel.updateTransactionByOrderId(req.body.orderId, { status: 'completed' });
+          await balanceModel.addTipToBalance(tx.author_id, tx.amount);
+        }
+        res.json({ status: 'completed', message: 'Pago ya registrado' });
+        return;
+      }
+    }
+    const detail = PayPalError ? JSON.stringify(PayPalError) : err.message;
     console.error('captureTip error:', detail);
     res.status(500).json({ error: detail.substring(0, 400) });
   }

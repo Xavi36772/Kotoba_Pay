@@ -56,6 +56,18 @@ export async function updateTransactionBySubscriptionId(subscriptionId: string, 
   return data;
 }
 
+export async function findTransactionByOrderId(orderId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('payment_transactions')
+    .select('*')
+    .eq('paypal_order_id', orderId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data;
+}
+
 export async function getTransactionHistory(userId: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
