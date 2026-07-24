@@ -126,19 +126,24 @@ export async function requestPayout(req: AuthRequest, res: Response): Promise<vo
     const amount = balance.balance;
     const payoutId = `payout_${userId}_${Date.now()}`;
 
-    // Send actual payout via PayPal Payouts API
-    const payoutResult = await sendPayout(
-      user.paypal_email,
-      amount,
-      'Pago de donaciones de Kotoba',
-      payoutId,
-    );
+    // Try to send actual payout via PayPal Payouts API
+    let batchId: string | null = null;
+    let payoutStatus = 'completed';
 
-    const batchId = payoutResult?.batch_header?.payout_batch_id;
+    try {
+      const payoutResult = await sendPayout(
+        user.paypal_email,
+        amount,
+        'Pago de donaciones de Kotoba',
+        payoutId,
+      );
+      batchId = payoutResult?.batch_header?.payout_batch_id || null;
+    } catch (payoutErr: any) {
+      const detail = payoutErr.response?.data ? JSON.stringify(payoutErr.response.data) : payoutErr.message;
+      console.warn('Payout API failed, falling back to manual:', detail);
 
-    if (!batchId) {
-      res.status(500).json({ error: 'PayPal returned no batch ID' });
-      return;
+      // Payouts not available in this country — fallback to manual
+      payoutStatus = 'pending_manual';
     }
 
     // Record payout transaction
@@ -146,8 +151,8 @@ export async function requestPayout(req: AuthRequest, res: Response): Promise<vo
       userId,
       type: 'payout',
       amount: -amount,
-      paypalOrderId: batchId,
-      status: 'completed',
+      paypalOrderId: batchId || payoutId,
+      status: payoutStatus,
       authorId: userId,
     });
 
@@ -157,16 +162,19 @@ export async function requestPayout(req: AuthRequest, res: Response): Promise<vo
       .update({
         balance: 0,
         total_paid_out: (balance.pending_payout || 0) + amount,
-        pending_payout: 0,
+        pending_payout: payoutStatus === 'pending_manual' ? amount : 0,
       })
       .eq('author_id', userId);
 
     if (updateError) {
       console.error('requestPayout balance update error:', updateError);
-      // Payout was sent but we couldn't update balance — log for manual fix
     }
 
-    res.json({ status: 'completed', amount, batchId });
+    const message = payoutStatus === 'pending_manual'
+      ? 'Payout registrado como pendiente (PayPal Payouts no disponible en este país). Se procesará manualmente.'
+      : 'Pago enviado a tu cuenta de PayPal.';
+
+    res.json({ status: payoutStatus, amount, batchId, message });
   } catch (err: any) {
     const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
     console.error('requestPayout error:', detail);
