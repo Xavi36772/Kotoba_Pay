@@ -50,7 +50,41 @@ export async function getBalance(req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    res.json(data || { author_id: userId, balance: 0, total_earned: 0, total_paid_out: 0, pending_payout: 0 });
+    if (data) {
+      res.json(data);
+      return;
+    }
+
+    // Lazy reconciliation: calculate from completed transactions
+    const { data: txs, error: txError } = await supabase
+      .from('payment_transactions')
+      .select('amount')
+      .eq('author_id', userId)
+      .eq('status', 'completed');
+
+    if (txError) {
+      console.error('getBalance tx error:', txError);
+      res.json({ author_id: userId, balance: 0, total_earned: 0, total_paid_out: 0, pending_payout: 0 });
+      return;
+    }
+
+    const totalEarned = (txs || []).reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+
+    // Auto-create balance record
+    if (totalEarned > 0) {
+      const { data: newBalance, error: insertError } = await supabase
+        .from('author_balances')
+        .insert({ author_id: userId, balance: totalEarned, total_earned: totalEarned })
+        .select()
+        .single();
+
+      if (!insertError && newBalance) {
+        res.json(newBalance);
+        return;
+      }
+    }
+
+    res.json({ author_id: userId, balance: 0, total_earned: 0, total_paid_out: 0, pending_payout: 0 });
   } catch (err: any) {
     console.error('getBalance error:', err.message);
     res.status(500).json({ error: 'Failed to get balance' });
